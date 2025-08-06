@@ -4,45 +4,37 @@ This project automates the process of inputting voucher data from a CSV spreadsh
 
 ## Features
 
-- Connects to an existing Chrome session (no need to handle login)
+- Automatically launches Chrome and navigates to the website
 - Extracts serial numbers and PINs from spreadsheet data
 - Automates browser interaction to input data into the website
 - Handles different page outcomes (success or error)
 - Creates a results CSV file and HTML report with color-coded results
 - Supports various formats of serial numbers and PINs in the input data
+- Robust file path handling for input and output files
 
 ## Requirements
 
 - Python 3.7 or higher
 - Chrome browser
-- ChromeDriver (included in the project)
 
 ## Installation
 
-1. Install the required Python package:
+1. Install the required Python packages:
 
 ```bash
-pip install selenium==4.10.0
+pip install -r requirements.txt
 ```
 
-2. The ChromeDriver is already included in the project directory.
+2. The script will automatically download the correct ChromeDriver version for your Chrome browser.
 
 ## Usage
 
 ### Quick Start (Windows)
 
-1. First, start Chrome with remote debugging enabled:
-   - Double-click on **start_chrome_with_debugging.bat**
-   - This will close all existing Chrome windows and start a new one with remote debugging enabled
-   - Log in to the Virgin Experience Days website
-
-2. Then run one of these batch files:
-   - **run_voucher_automation.bat** - Runs the main automation script
-   - **run_test_extraction.bat** - Runs the extraction test tool
+Run the batch file:
+- **run_voucher_automation.bat** - Downloads the correct ChromeDriver, updates dependencies, and runs the main automation script
 
 ### Manual Execution
-
-#### Voucher Automation Script
 
 Run the main automation script:
 
@@ -50,20 +42,12 @@ Run the main automation script:
 python voucher_automation_simple.py
 ```
 
-#### Test Extraction Tool
-
-Run the extraction test tool to verify serial/PIN extraction:
-
-```bash
-python test_extraction_simple.py
-```
-
 When running the automation script:
 
 1. You'll be prompted to enter the path to your CSV file (or press Enter to use the default)
-2. You'll be asked to enter the Chrome debugging port (default is 9222)
-3. The script will connect to your existing Chrome session
-4. Once connected, press Enter to start the automation
+2. The script will launch Chrome and navigate to the website
+3. Log in to the website when prompted
+4. Press Enter to start the automation
 5. The script will process each row in the spreadsheet
 6. Results will be saved to a new CSV file and an HTML report will be generated
 
@@ -87,10 +71,13 @@ Example of valid formats in the Info column:
 - If the script fails to extract serial numbers and PINs, check the format in your spreadsheet
 - If the browser automation fails, ensure you're logged in and on the correct page
 - Check the console output for error messages
+- If there are issues with file paths, the script will attempt to save results to the local directory
 
 ## Notes
 
 - The script will skip rows that already have "Claimed" in the Satus column
+- The script will automatically stop processing when it encounters a completely blank row
 - The script generates an HTML report that will automatically open in your browser
 - The HTML report provides a color-coded view of the results (green for success, red for errors)
 - The script includes error handling to recover from most issues
+- Results are always saved to the local directory to avoid path-related issues

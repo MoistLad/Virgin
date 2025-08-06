@@ -258,11 +258,20 @@ def write_results_csv(input_file, results):
     Returns:
         str: Path to the output CSV file
     """
-    # Generate output file name
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_file = os.path.splitext(input_file)[0] + f"_results_{timestamp}.csv"
-    
     try:
+        # Clean up the input file path - remove quotes and normalize
+        input_file = input_file.strip('"\'')
+        
+        # Get just the filename without the path
+        input_filename = os.path.basename(input_file)
+        
+        # Generate output file name in the current directory
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_filename = os.path.splitext(input_filename)[0] + f"_results_{timestamp}.csv"
+        output_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), output_filename)
+        
+        print(f"Preparing to write results to: {output_file}")
+        
         with open(output_file, 'w', newline='', encoding='utf-8') as file:
             # Get all field names from the first result
             if results:
@@ -275,7 +284,24 @@ def write_results_csv(input_file, results):
         return output_file
     except Exception as e:
         print(f"Error writing results CSV: {str(e)}")
-        return None
+        print("Attempting to write to current directory instead...")
+        
+        try:
+            # Fallback to a simple filename in the current directory
+            output_file = f"voucher_results_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            
+            with open(output_file, 'w', newline='', encoding='utf-8') as file:
+                if results:
+                    fieldnames = list(results[0].keys())
+                    writer = csv.DictWriter(file, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(results)
+            
+            print(f"Results saved to {output_file}")
+            return output_file
+        except Exception as e2:
+            print(f"Error in fallback CSV writing: {str(e2)}")
+            return None
 
 def generate_html_report(results, output_file):
     """
@@ -283,14 +309,16 @@ def generate_html_report(results, output_file):
     
     Args:
         results (list): List of dictionaries with results
-        output_file (str): Path to the output HTML file
+        output_file (str): Path to the output CSV file
         
     Returns:
         str: Path to the HTML report
     """
-    html_file = os.path.splitext(output_file)[0] + ".html"
-    
     try:
+        # Generate HTML file name from the CSV file
+        html_file = os.path.splitext(output_file)[0] + ".html"
+        print(f"Preparing to generate HTML report: {html_file}")
+        
         with open(html_file, 'w', encoding='utf-8') as file:
             # Write HTML header
             file.write("""
@@ -347,7 +375,69 @@ def generate_html_report(results, output_file):
         return html_file
     except Exception as e:
         print(f"Error generating HTML report: {str(e)}")
-        return None
+        print("Attempting to write HTML report to current directory instead...")
+        
+        try:
+            # Fallback to a simple filename in the current directory
+            html_file = f"voucher_results_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+            
+            with open(html_file, 'w', encoding='utf-8') as file:
+                # Write HTML header
+                file.write("""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Voucher Processing Results</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 20px; }
+                        table { border-collapse: collapse; width: 100%; }
+                        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                        th { background-color: #f2f2f2; }
+                        tr:nth-child(even) { background-color: #f9f9f9; }
+                        .success { background-color: #dff0d8; color: #3c763d; }
+                        .error { background-color: #f2dede; color: #a94442; }
+                        .header { margin-bottom: 20px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1>Voucher Processing Results</h1>
+                        <p>Generated on: """ + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + """</p>
+                    </div>
+                    <table>
+                        <tr>
+                """)
+                
+                # Write table headers
+                if results:
+                    for key in results[0].keys():
+                        file.write(f"<th>{key}</th>")
+                    file.write("</tr>")
+                    
+                    # Write table rows
+                    for row in results:
+                        if row.get('Result') == 'Claimed':
+                            file.write('<tr class="success">')
+                        else:
+                            file.write('<tr class="error">')
+                        
+                        for key, value in row.items():
+                            file.write(f"<td>{value}</td>")
+                        
+                        file.write("</tr>")
+                
+                # Write HTML footer
+                file.write("""
+                    </table>
+                </body>
+                </html>
+                """)
+            
+            print(f"HTML report generated: {html_file}")
+            return html_file
+        except Exception as e2:
+            print(f"Error in fallback HTML report generation: {str(e2)}")
+            return None
 
 def main():
     """
@@ -372,26 +462,21 @@ def main():
         
         print(f"Found {len(data)} rows in the CSV file.")
         
-        # Connect to an existing Chrome session
-        print("\n=== CONNECTING TO EXISTING CHROME SESSION ===")
-        print("Please make sure Chrome is already open with the Virgin Experience Days website.")
-        print("The script will connect to this existing session.\n")
+        # Launch a new Chrome session directly
+        print("\n=== LAUNCHING NEW CHROME SESSION ===")
+        print("The script will start a new Chrome browser.\n")
         
-        # Set up Chrome options for connecting to existing session
+        # Set up Chrome options
         from selenium.webdriver.chrome.options import Options
         chrome_options = Options()
         
-        # Try to connect to an existing Chrome session
-        # This requires Chrome to be started with the --remote-debugging-port flag
+        # Add some options to make Chrome more stable
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--window-size=1920,1080")
+        
         try:
-            # Ask for the debugging port
-            debug_port = input("Enter Chrome debugging port (default is 9222): ")
-            if not debug_port:
-                debug_port = "9222"
-            
-            # Configure Chrome to connect to the existing session
-            chrome_options.add_experimental_option("debuggerAddress", f"localhost:{debug_port}")
-            
             # Use the ChromeDriver in the current directory
             from selenium.webdriver.chrome.service import Service
             chrome_driver_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chromedriver.exe")
@@ -401,46 +486,24 @@ def main():
             service = Service(executable_path=chrome_driver_path)
             
             # Initialize Chrome with the service and options
+            print("Initializing Chrome...")
             driver = webdriver.Chrome(service=service, options=chrome_options)
+            
+            # Navigate to the website
+            print("Navigating to the Acorne SVS website...")
+            driver.get("https://www.acornesvs.co.uk/vouchers/search.aspx")
             
             # Check if we're connected
             current_url = driver.current_url
             print(f"Successfully connected to Chrome! Current URL: {current_url}")
             
         except Exception as e:
-            print(f"\nError connecting to existing Chrome session: {str(e)}")
-            print("\nTo use this feature, you need to start Chrome with remote debugging enabled.")
-            print("Here's how to do it:")
-            print("1. Close all Chrome windows")
-            print("2. Open Command Prompt")
-            print('3. Run: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --remote-debugging-port=9222')
-            print("4. Navigate to the Virgin Experience Days website")
-            print("5. Run this script again and enter port 9222 when prompted")
-            
-            # Ask if the user wants to continue with a new browser session instead
-            fallback = input("\nWould you like to continue with a new browser session instead? (y/n): ")
-            if fallback.lower() == 'y':
-                print("\nStarting a new Chrome session...")
-                
-                # Initialize the WebDriver with the local ChromeDriver
-                from selenium.webdriver.chrome.service import Service
-                
-                # Use the ChromeDriver in the current directory
-                chrome_driver_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chromedriver.exe")
-                print(f"Using ChromeDriver at: {chrome_driver_path}")
-                
-                # Create a Service object
-                service = Service(executable_path=chrome_driver_path)
-                
-                # Initialize Chrome with the service
-                driver = webdriver.Chrome(service=service)
-                
-                # Navigate to the website
-                driver.get("https://www.acornesvs.co.uk/vouchers/search.aspx")
-                print(f"Navigated to Acorne SVS website")
-            else:
-                print("Exiting...")
-                return
+            print(f"\nError launching Chrome: {str(e)}")
+            print("\nDetailed error information:")
+            import traceback
+            traceback.print_exc()
+            print("\nExiting...")
+            return
         
         print("Please log in to the website if needed.")
         input("Press Enter once you are logged in and on the voucher search page...")
@@ -448,6 +511,18 @@ def main():
         # Process each row
         results = []
         for idx, row in enumerate(data):
+            # Check if the row is completely empty or has no meaningful data
+            is_empty_row = True
+            for key, value in row.items():
+                if value and value.strip():
+                    is_empty_row = False
+                    break
+            
+            # If we encounter a completely empty row, stop processing
+            if is_empty_row:
+                print(f"Encountered empty row at {idx+2}. Stopping processing.")
+                break
+            
             # Get the info text from the Info column
             info_text = row.get('Info', '')
             
@@ -483,6 +558,11 @@ def main():
                 # Wait a bit between vouchers to avoid overwhelming the site
                 time.sleep(1)
             else:
+                # If the Info column is empty or contains only whitespace, consider it an empty row
+                if not info_text or not info_text.strip():
+                    print(f"Encountered row with empty Info column at {idx+2}. Stopping processing.")
+                    break
+                
                 print(f"Could not extract serial and PIN from row {idx+2}: {info_text}")
                 
                 # Add to results with error
